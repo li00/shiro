@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	   xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context.xsd">
+
+	<!--securityManager 需配置三个属性-->
+	<bean id="securityManager" class="org.apache.shiro.web.mgt.DefaultWebSecurityManager">
+		<property name="cacheManager" ref="cacheManager"/>
+		<!--<property name="realm" ref="jdbcRealm"/>-->
+		<property name="authenticator" ref="authenticator"/>
+		<property name="realms">
+			<list>
+				<ref bean="jdbcRealm"/>
+				<ref bean="secondRealm"/>
+			</list>
+		</property>
+		<!--设置cookie过时时间-->
+		<property name="rememberMeManager.cookie.maxAge" value="10"/>
+	</bean>
+
+	<bean id="cacheManager" class="org.apache.shiro.cache.ehcache.EhCacheManager">
+		<property name="cacheManagerConfigFile" value="classpath:ehcache.xml"/>
+	</bean>
+
+	<bean id="authenticator" class="org.apache.shiro.authc.pam.ModularRealmAuthenticator">
+		<!--<property name="realms">
+			<list>
+				<ref bean="jdbcRealm"/>
+				<ref bean="secondRealm"/>
+			</list>
+		</property>-->
+		<!--认证策略-->
+		<property name="authenticationStrategy">
+			<!--所有realm都要通过才能通过
+			<bean class="org.apache.shiro.authc.pam.AllSuccessfulStrategy"/>-->
+			<!--单个-->
+			<bean class="org.apache.shiro.authc.pam.FirstSuccessfulStrategy"/>
+		</property>
+	</bean>
+
+	<!--class是自己手写的-->
+	<bean id="jdbcRealm" class="com.lzf.shiro.realm.ShiroRealm">
+		<!--&lt;!&ndash;MD5加密算法&ndash;&gt;
+		<property name="credentialsMatcher">
+			<bean class="org.apache.shiro.authc.credential.HashedCredentialsMatcher">
+				<property name="hashAlgorithmName" value="MD5"/>
+				<property name="hashIterations" value="1024"/>
+			</bean>
+		</property>-->
+	</bean>
+	<!--class是自己手写的-->
+	<bean id="secondRealm" class="com.lzf.shiro.realm.SecondRealm">
+		<!--SHA1加密算法-->
+		<!--<property name="credentialsMatcher">
+			<bean class="org.apache.shiro.authc.credential.HashedCredentialsMatcher">
+				<property name="hashAlgorithmName" value="SHA1"/>
+				<property name="hashIterations" value="1024"/>
+			</bean>
+		</property>-->
+	</bean>
+
+	<!--可以自动的来调用配置在spring IOC 容器中 shiro bean的生命周期-->
+	<bean id="lifecycleBeanPostProcessor" class="org.apache.shiro.spring.LifecycleBeanPostProcessor"/>
+
+	<!--启用IOC容器中shiro的注解,但必须在配置了lifecycleBeanPostProcessor之后才能使用-->
+	<bean class="org.springframework.aop.framework.autoproxy.DefaultAdvisorAutoProxyCreator"
+		  depends-on="lifecycleBeanPostProcessor"/>
+	<bean class="org.apache.shiro.spring.security.interceptor.AuthorizationAttributeSourceAdvisor">
+		<property name="securityManager" ref="securityManager"/>
+	</bean>
+
+	<!--配置shiroFilter, 跟卸载web.xml的配置的过滤器名称是一致的-->
+	<bean id="shiroFilter" class="org.apache.shiro.spring.web.ShiroFilterFactoryBean">
+		<property name="securityManager" ref="securityManager"/>
+		<property name="loginUrl" value="/page/login.jsp"/>
+		<property name="successUrl" value="/page/success.jsp"/>
+		<!--没有权限统一页面-->
+		<property name="unauthorizedUrl" value="/page/unauthorized.jsp"/>
+
+		<property name="filterChainDefinitionMap" ref="filterChainDefinitionMap"/>
+
+		<!--配置受保护页面，以及访问页面权限
+		<property name="filterChainDefinitions">
+			<value>
+				&lt;!&ndash;anon表示可以匿名访问, authc表示需要认证,logout登出&ndash;&gt;
+				/page/login.jsp = anon
+				/page/admin.jsp = roles[admin]
+				/page/user.jsp = roles[user]
+				/shiro/login = anon
+				/shiro/logout = logout
+				/*/* = authc
+			</value>
+		</property>-->
+	</bean>
+	<!--通过数据库来配置受保护页面，以及访问页面权限-->
+	<bean id="filterChainDefinitionMap"
+		  factory-bean="filterChainDefinitionMapBuilder" factory-method="filterChainDefinitionMap"></bean>
+
+	<bean id="filterChainDefinitionMapBuilder"
+		  class="com.lzf.shiro.factory.FilterChainDefinitionMapBuilder"></bean>
+	<!--注解bean-->
+	<bean id="shiroService" class="com.lzf.shiro.service.ShiroService"></bean>
+</beans>
